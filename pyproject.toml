@@ -2,8 +2,13 @@
 name = "opsb-pyloopkit"
 version = "0.1.0"
 description = ""
-authors = ["Oliver Searle-Barnes <oliver@opsb.co.uk>"]
+authors = ["Oliver Searle-Barnes <oliver@opsb.co.uk>", "Russel Wilson <rpwils>", "Pete Schwamb <ps2>"]
 readme = "README.md"
+packages = [ 
+    { include = "pyloopkit" }
+]
+license = "BSD"
+homepage = "https://github.com/tidepool-org/PyLoopKit"
 
 [tool.poetry.dependencies]
 python = "^3.9"
