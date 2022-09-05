@@ -12,21 +12,27 @@ Github URL: https://github.com/tidepool-org/LoopKit/blob/
 # disable pylint errors for too many arguments/variables
 from datetime import timedelta
 import numpy
-from backports.datetime_fromisoformat import MonkeyPatch
-MonkeyPatch.patch_fromisoformat()
 
-from pyloopkit.date import (date_floored_to_time_interval,
-                  date_ceiled_to_time_interval, time_interval_since)
+from pyloopkit.date import (
+    date_floored_to_time_interval,
+    date_ceiled_to_time_interval,
+    time_interval_since,
+)
 
 
 def predict_glucose(
-        starting_date, starting_glucose,
-        momentum_dates=[], momentum_values=None,
-        carb_effect_dates=[], carb_effect_values=None,
-        insulin_effect_dates=[], insulin_effect_values=None,
-        correction_effect_dates=[], correction_effect_values=None
-        ):
-    """ Calculates a timeline of predicted glucose values
+    starting_date,
+    starting_glucose,
+    momentum_dates=[],
+    momentum_values=None,
+    carb_effect_dates=[],
+    carb_effect_values=None,
+    insulin_effect_dates=[],
+    insulin_effect_values=None,
+    correction_effect_dates=[],
+    correction_effect_values=None,
+):
+    """Calculates a timeline of predicted glucose values
         from a variety of effects timelines.
 
     Each effect timeline:
@@ -56,27 +62,32 @@ def predict_glucose(
     Glucose predictions in form (prediction_times, prediction_glucose_values)
     """
     if momentum_dates:
-        assert len(momentum_dates) == len(momentum_values),\
-            "expected input shapes to match"
+        assert len(momentum_dates) == len(
+            momentum_values
+        ), "expected input shapes to match"
 
     if carb_effect_dates:
-        assert len(carb_effect_dates) == len(carb_effect_values),\
-            "expected input shapes to match"
+        assert len(carb_effect_dates) == len(
+            carb_effect_values
+        ), "expected input shapes to match"
 
     if insulin_effect_dates:
-        assert len(insulin_effect_dates) == len(insulin_effect_values),\
-            "expected input shapes to match"
+        assert len(insulin_effect_dates) == len(
+            insulin_effect_values
+        ), "expected input shapes to match"
 
     if correction_effect_dates:
-        assert len(correction_effect_dates) == len(correction_effect_values),\
-            "expected input shapes to match"
+        assert len(correction_effect_dates) == len(
+            correction_effect_values
+        ), "expected input shapes to match"
 
     # if we didn't get any effect data, we won't predict the glucose
-    if (not momentum_dates and
-            not carb_effect_dates and
-            not insulin_effect_dates and
-            not correction_effect_dates
-       ):
+    if (
+        not momentum_dates
+        and not carb_effect_dates
+        and not insulin_effect_dates
+        and not correction_effect_dates
+    ):
         return ([], [])
 
     merged_dates = sorted(
@@ -94,44 +105,31 @@ def predict_glucose(
 
     if carb_effect_dates:
         previous_effect_value = carb_effect_values[0] or 0
-        for i in range(0,
-                       len(carb_effect_dates)
-                       ):
+        for i in range(0, len(carb_effect_dates)):
             value = carb_effect_values[i]
             list_index = merged_dates.index(carb_effect_dates[i])
-            merged_values[list_index] = (
-                value
-                - previous_effect_value
-            )
+            merged_values[list_index] = value - previous_effect_value
 
             previous_effect_value = value
 
     if insulin_effect_dates:
         previous_effect_value = insulin_effect_values[0] or 0
-        for i in range(0,
-                       len(insulin_effect_dates)
-                       ):
+        for i in range(0, len(insulin_effect_dates)):
             value = insulin_effect_values[i]
             list_index = merged_dates.index(insulin_effect_dates[i])
             merged_values[list_index] = (
-                merged_values[list_index]
-                + value
-                - previous_effect_value
+                merged_values[list_index] + value - previous_effect_value
             )
 
             previous_effect_value = value
 
     if correction_effect_dates:
         previous_effect_value = correction_effect_values[0] or 0
-        for i in range(0,
-                       len(correction_effect_dates)
-                       ):
+        for i in range(0, len(correction_effect_dates)):
             value = correction_effect_values[i]
             list_index = merged_dates.index(correction_effect_dates[i])
             merged_values[list_index] = (
-                merged_values[list_index]
-                + value
-                - previous_effect_value
+                merged_values[list_index] + value - previous_effect_value
             )
 
             previous_effect_value = value
@@ -144,22 +142,13 @@ def predict_glucose(
         # and ends at the last momentum point (0.0)
         # This assumes the first one occurs on/before the starting glucose
         blend_count = len(momentum_dates) - 2
-        time_delta = time_interval_since(
-            momentum_dates[1],
-            momentum_dates[0]
-            )
+        time_delta = time_interval_since(momentum_dates[1], momentum_dates[0])
         # The difference between the first momentum value
         # and the starting glucose value
-        momentum_offset = time_interval_since(
-            starting_date,
-            momentum_dates[0]
-            )
+        momentum_offset = time_interval_since(starting_date, momentum_dates[0])
 
         blend_slope = 1 / blend_count
-        blend_offset = (momentum_offset
-                        / time_delta
-                        * blend_slope
-                        )
+        blend_offset = momentum_offset / time_delta * blend_slope
 
         for i in range(0, len(momentum_dates)):
             value = momentum_values[i]
@@ -168,18 +157,16 @@ def predict_glucose(
 
             effect_value_change = value - previous_effect_value
 
-            split = min(1,
-                        max(0,
-                            (len(momentum_dates) - i)
-                            / blend_count
-                            - blend_slope
-                            + blend_offset
-                            )
-                        )
-            effect_blend = (
-                (1 - split)
-                * merged_values[merge_index]
+            split = min(
+                1,
+                max(
+                    0,
+                    (len(momentum_dates) - i) / blend_count
+                    - blend_slope
+                    + blend_offset,
+                ),
             )
+            effect_blend = (1 - split) * merged_values[merge_index]
             momentum_blend = split * effect_value_change
 
             merged_values[merge_index] = effect_blend + momentum_blend
@@ -192,26 +179,17 @@ def predict_glucose(
         if merged_dates[i] > starting_date:
             last_value = predicted_values[-1]
 
-            predicted_dates.append(
-                merged_dates[i]
-            )
-            predicted_values.append(
-                last_value
-                + merged_values[i]
-            )
+            predicted_dates.append(merged_dates[i])
+            predicted_values.append(last_value + merged_values[i])
 
-    assert len(predicted_dates) == len(predicted_values),\
-        "expected output shapes to match"
+    assert len(predicted_dates) == len(
+        predicted_values
+    ), "expected output shapes to match"
     return (predicted_dates, predicted_values)
 
 
-def decay_effect(
-        glucose_date, glucose_value,
-        rate,
-        duration,
-        delta=5
-        ):
-    """ Calculates a timeline of glucose effects by applying a
+def decay_effect(glucose_date, glucose_value, rate, duration, delta=5):
+    """Calculates a timeline of glucose effects by applying a
         linear decay to a rate of change.
 
     Arguments:
@@ -224,14 +202,9 @@ def decay_effect(
     Output:
     Glucose effects in format (effect_date, effect_value)
     """
-    (start_date,
-     end_date
-     ) = simulation_date_range_for_samples(
-         [glucose_date],
-         [],
-         duration,
-         delta
-         )
+    (start_date, end_date) = simulation_date_range_for_samples(
+        [glucose_date], [], duration, delta
+    )
 
     # The starting rate, which we will decay to 0 over the specified duration
     intercept = rate
@@ -240,19 +213,14 @@ def decay_effect(
     effect_values = [glucose_value]
 
     date = decay_start_date = start_date + timedelta(minutes=delta)
-    slope = (-intercept
-             / (duration - delta)
-             )
+    slope = -intercept / (duration - delta)
 
     while date < end_date:
         value = (
             last_value
-            + (intercept
-               + slope * time_interval_since(
-                   date, decay_start_date
-                   )
-               / 60) * delta
-                )
+            + (intercept + slope * time_interval_since(date, decay_start_date) / 60)
+            * delta
+        )
 
         effect_dates.append(date)
         effect_values.append(value)
@@ -260,22 +228,15 @@ def decay_effect(
         last_value = value
         date = date + timedelta(minutes=delta)
 
-    assert len(effect_dates) == len(effect_values),\
-        "expected output shapes to match"
+    assert len(effect_dates) == len(effect_values), "expected output shapes to match"
 
     return (effect_dates, effect_values)
 
 
 def simulation_date_range_for_samples(
-        start_times,
-        end_times,
-        duration,
-        delta,
-        start=None,
-        end=None,
-        delay=0
-        ):
-    """ Create date range based on samples and user-specified parameters
+    start_times, end_times, duration, delta, start=None, end=None, delay=0
+):
+    """Create date range based on samples and user-specified parameters
 
     Arguments:
     start_times -- list of datetime object(s) at start
@@ -290,9 +251,10 @@ def simulation_date_range_for_samples(
     tuple with (start_time, end_time) structure
     """
     if start is not None and end is not None:
-        return(date_floored_to_time_interval(start, delta),
-               date_ceiled_to_time_interval(end, delta)
-               )
+        return (
+            date_floored_to_time_interval(start, delta),
+            date_ceiled_to_time_interval(end, delta),
+        )
 
     if not start_times:
         raise ValueError
@@ -313,23 +275,18 @@ def simulation_date_range_for_samples(
 
     start_date = date_floored_to_time_interval(start or min_date, delta)
     end_date = date_ceiled_to_time_interval(
-        end or max_date
-        + timedelta(minutes=duration+delay),
-        delta
+        end or max_date + timedelta(minutes=duration + delay), delta
     )
 
     assert start_date <= end_date, "expected start to be less than end"
 
-    return (start_date,
-            end_date
-            )
+    return (start_date, end_date)
 
 
-def subtracting(starts, ends, values,
-                other_starts, other_ends, other_values,
-                effect_interval
-                ):
-    """ Subtracts an array of glucose effects with uniform intervals and
+def subtracting(
+    starts, ends, values, other_starts, other_ends, other_values, effect_interval
+):
+    """Subtracts an array of glucose effects with uniform intervals and
         no gaps from the collection of effect changes, which may not
         have uniform intervals.
 
@@ -349,31 +306,17 @@ def subtracting(starts, ends, values,
     The resulting glucose effects in the form
     (start_times, end_times, values)
     """
-    assert len(starts) == len(ends) == len(values),\
-        "expected input shapes to match"
-    assert len(other_starts) == len(other_values),\
-        "expected input shapes to match"
+    assert len(starts) == len(ends) == len(values), "expected input shapes to match"
+    assert len(other_starts) == len(other_values), "expected input shapes to match"
     # Trim both collections to match
-    (other_starts,
-     other_ends,
-     other_values
-     ) = filter_date_range(
-         other_starts, other_ends, other_values,
-         ends[0],
-         None
-         )
-    (starts,
-     ends,
-     values
-     ) = filter_date_range(
-         starts, ends, values,
-         other_starts[0],
-         None
-         )
+    (other_starts, other_ends, other_values) = filter_date_range(
+        other_starts, other_ends, other_values, ends[0], None
+    )
+    (starts, ends, values) = filter_date_range(
+        starts, ends, values, other_starts[0], None
+    )
 
-    (subtracted_starts,
-     subtracted_values
-     ) = ([], [])
+    (subtracted_starts, subtracted_values) = ([], [])
 
     previous_other_effect_value = other_values[0]
     effect_index = 0
@@ -395,17 +338,11 @@ def subtracting(starts, ends, values,
             continue  # move on to next one
 
         effect_value = values[effect_index]
-        effect_value_matching_other_effect_interval = (
-            effect_value
-            * effect_interval
-        )
+        effect_value_matching_other_effect_interval = effect_value * effect_interval
 
-        subtracted_starts.append(
-            ends[effect_index]
-        )
+        subtracted_starts.append(ends[effect_index])
         subtracted_values.append(
-            effect_value_matching_other_effect_interval
-            - other_effect_change
+            effect_value_matching_other_effect_interval - other_effect_change
         )
 
         effect_index += 1
@@ -414,30 +351,20 @@ def subtracting(starts, ends, values,
     # we assume the other_effect_change remains zero
     for i in range(effect_index, len(starts)):
         effect_value = values[i]
-        effect_value_matching_other_effect_interval = (
-            effect_value
-            * effect_interval
-        )
+        effect_value_matching_other_effect_interval = effect_value * effect_interval
 
-        subtracted_starts.append(
-            ends[i]
-        )
-        subtracted_values.append(
-            effect_value_matching_other_effect_interval
-        )
+        subtracted_starts.append(ends[i])
+        subtracted_values.append(effect_value_matching_other_effect_interval)
 
-    assert len(subtracted_starts) == len(subtracted_values),\
-        "expected output shapes to match"
+    assert len(subtracted_starts) == len(
+        subtracted_values
+    ), "expected output shapes to match"
 
     return (subtracted_starts, subtracted_values)
 
 
-def filter_date_range(
-        starts, ends, values,
-        start_date,
-        end_date
-        ):
-    """ Returns tuple of elements filtered by the specified date range.
+def filter_date_range(starts, ends, values, start_date, end_date):
+    """Returns tuple of elements filtered by the specified date range.
 
     Arguments:
     starts -- start dates (datetime)
@@ -452,13 +379,9 @@ def filter_date_range(
     """
     # ends might not necesarily be the same length as starts/values
     # because not all types have "end dates"
-    assert len(starts) == len(values),\
-        "expected input shapes to match"
+    assert len(starts) == len(values), "expected input shapes to match"
 
-    (filtered_starts,
-     filtered_ends,
-     filtered_values
-     ) = ([], [], [])
+    (filtered_starts, filtered_ends, filtered_values) = ([], [], [])
 
     for i in range(0, len(starts)):
         if start_date and ends and ends[i] < start_date:
@@ -474,14 +397,15 @@ def filter_date_range(
         filtered_ends.append(ends[i] if ends else None)
         filtered_values.append(values[i])
 
-    assert len(filtered_starts) == len(filtered_ends) == len(filtered_values),\
-        "expected output shapes to match"
+    assert (
+        len(filtered_starts) == len(filtered_ends) == len(filtered_values)
+    ), "expected output shapes to match"
 
     return (filtered_starts, filtered_ends, filtered_values)
 
 
 def sort_dose_lists(list_1, list_2, list_3=None, list_4=None, list_5=None):
-    """ Sort dose lists that are matched index-wise, using the *second* list as
+    """Sort dose lists that are matched index-wise, using the *second* list as
          the property to sort by
 
     Example:
@@ -515,10 +439,7 @@ def sort_dose_lists(list_1, list_2, list_3=None, list_4=None, list_5=None):
     return (l1, list_2, l3, l4, l5)
 
 
-def combined_sums(
-        starts, ends, values,
-        duration
-        ):
+def combined_sums(starts, ends, values, duration):
     """
     Sums adjacent glucose effects into buckets of the specified duration.
 
@@ -534,8 +455,7 @@ def combined_sums(
     Output:
     Summed effects in format (start_dates, end_dates, values)
     """
-    assert len(starts) == len(values),\
-        "expected input shapes to match"
+    assert len(starts) == len(values), "expected input shapes to match"
 
     sum_starts = []
     sum_ends = []
@@ -551,20 +471,18 @@ def combined_sums(
         sum_ends.append(ends[i] if ends else starts[i])
         sum_values.append(values[i])
 
-        for sums_index in range(last_valid_index, len(sum_starts)-1):
-            if (ends
-                    and sum_ends[sums_index]
-                    and (sum_ends[sums_index]
-                         > ends[i] + timedelta(minutes=duration)
-                         )
-               ):
+        for sums_index in range(last_valid_index, len(sum_starts) - 1):
+            if (
+                ends
+                and sum_ends[sums_index]
+                and (sum_ends[sums_index] > ends[i] + timedelta(minutes=duration))
+            ):
                 last_valid_index += 1
                 continue
 
-            elif (sum_ends[sums_index]
-                  and sum_ends[sums_index]
-                  > starts[i] + timedelta(minutes=duration)
-                  ):
+            elif sum_ends[sums_index] and sum_ends[sums_index] > starts[i] + timedelta(
+                minutes=duration
+            ):
                 last_valid_index += 1
                 continue
 
@@ -573,21 +491,19 @@ def combined_sums(
                 sum_ends[sums_index] = ends[i] if ends else starts[i]
             sum_values[sums_index] += values[i]
 
-    assert len(sum_starts) == len(sum_ends) == len(sum_values),\
-        "expected output shapes to match"
+    assert (
+        len(sum_starts) == len(sum_ends) == len(sum_values)
+    ), "expected output shapes to match"
 
     sum_starts.reverse()
     sum_ends.reverse()
     sum_values.reverse()
 
-    return (sum_starts,
-            sum_ends,
-            sum_values
-            )
+    return (sum_starts, sum_ends, sum_values)
 
 
 def lists_sorter(list_1, list_2, list_3=None, list_4=None, list_5=None):
-    """ Sort lists that are matched index-wise, using the first list as the
+    """Sort lists that are matched index-wise, using the first list as the
         property to sort by
 
     Example:
