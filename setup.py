@@ -8,7 +8,7 @@ if sys.version_info < (3, 7):
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-version_string = "v0.1.0"
+version_string = "v0.1.1"
 
 setup(
     name="pyloopkit",
