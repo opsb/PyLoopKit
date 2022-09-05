@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "pyloopkit"
+name = "opsb-pyloopkit"
 version = "0.1.0"
 description = ""
 authors = ["Oliver Searle-Barnes <oliver@opsb.co.uk>"]
